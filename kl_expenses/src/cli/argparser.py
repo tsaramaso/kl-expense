@@ -1,7 +1,7 @@
 from argparse import ArgumentParser, Namespace
 from sqlalchemy.orm import Session, sessionmaker
 
-from src.manage import add_user, list_users, remove_user, restore_user
+from src.cli.manage import add_user, list_users, remove_user, restore_user
 
 
 def build_parser() -> ArgumentParser:

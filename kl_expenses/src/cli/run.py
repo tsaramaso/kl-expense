@@ -2,9 +2,9 @@
 
 from pathlib import Path
 
-from src.cli import build_parser, dispatch
+from src.cli.argparser import build_parser, dispatch
 from src.config import DATABASE_PATH, LOG_DIR
-from src.context import AppContext
+from src.app.context import AppContext
 
 
 def main(db_path: Path, log_dir: Path) -> None:

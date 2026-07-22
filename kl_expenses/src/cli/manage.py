@@ -2,7 +2,7 @@ from loguru import logger
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy import select
 
-from src.models import User
+from src.app.models import User
 
 
 def add_user(session_maker: sessionmaker[Session], name: str | None = None) -> None:

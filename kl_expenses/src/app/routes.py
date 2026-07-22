@@ -9,8 +9,8 @@ from flask import (
 )
 
 from src.auth import current_user, login_required
-from src.db_session import get_session
-from src.models import User
+from src.db import get_session
+from src.app.models import User
 
 bp = Blueprint("main", __name__)
 

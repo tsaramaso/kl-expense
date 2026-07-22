@@ -4,7 +4,7 @@ from sqlalchemy import Engine
 from sqlalchemy.orm import Session, sessionmaker
 
 from src.logger import configure_logging
-from src.db import init_db_engine, make_session_factory
+from src.db import init_db_engine, make_session
 
 
 @dataclass(frozen=True)
@@ -18,5 +18,5 @@ class AppContext:
         log_path.mkdir(parents=True, exist_ok=True)
         configure_logging(log_path)
         engine = init_db_engine(db_path)
-        session_factory = make_session_factory(engine)
+        session_factory = make_session(engine)
         return AppContext(engine=engine, session_factory=session_factory)

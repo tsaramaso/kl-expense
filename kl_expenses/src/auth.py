@@ -4,8 +4,8 @@ from typing import Callable
 
 from flask import redirect, session as flask_session, url_for
 
-from src.db_session import get_session
-from src.models import User
+from src.db import get_session
+from src.app.models import User
 
 
 def current_user() -> User | None:
