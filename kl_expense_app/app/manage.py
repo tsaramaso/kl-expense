@@ -1,5 +1,7 @@
 from loguru import logger
 from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy import select
+
 from app.models import User
 
 
@@ -17,10 +19,11 @@ def list_users(
     session_maker: sessionmaker[Session], show_inactive: bool = False
 ) -> None:
     with session_maker() as session:
-        query = session.query(User)
+        stmt = select(User)
         if not show_inactive:
-            query = query.filter_by(is_active=True)
-        users = query.order_by(User.created_at).all()
+            stmt = stmt.where(User.is_active.is_(True))
+        stmt = stmt.order_by(User.created_at)
+        users = session.scalars(stmt).all()
         if not users:
             print("No users yet.")
             return
@@ -29,7 +32,6 @@ def list_users(
             print(
                 f"{user.uuid}  {user.name or ''}  (created {user.created_at}){status}"
             )
-
 
 def remove_user(session_maker: sessionmaker[Session], target_uuid: str) -> None:
     with session_maker() as session:
