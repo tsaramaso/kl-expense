@@ -3,7 +3,7 @@ from pathlib import Path
 from sqlalchemy import Engine, create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
-from app.models import Base
+from src.models import Base
 
 
 def init_db_engine(db_path: Path) -> Engine:

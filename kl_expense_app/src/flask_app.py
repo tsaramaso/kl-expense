@@ -1,10 +1,10 @@
 # app/flask_app.py
 from flask import Flask
 
-from app.config import FORCE_SECURE_COOKIE, SECRET_KEY
-from app.context import AppContext
-from app.db_session import close_session, open_session
-from app.routes import bp
+from src.config import FORCE_SECURE_COOKIE, SECRET_KEY
+from src.context import AppContext
+from src.db_session import close_session, open_session
+from src.routes import bp
 
 
 def create_app(ctx: AppContext) -> Flask:

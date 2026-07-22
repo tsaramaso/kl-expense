@@ -3,8 +3,8 @@ from pathlib import Path
 from sqlalchemy import Engine
 from sqlalchemy.orm import Session, sessionmaker
 
-from app.logger import configure_logging
-from app.db import init_db_engine, make_session_factory
+from src.logger import configure_logging
+from src.db import init_db_engine, make_session_factory
 
 
 @dataclass(frozen=True)

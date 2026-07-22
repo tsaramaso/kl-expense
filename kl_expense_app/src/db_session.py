@@ -2,7 +2,7 @@
 from flask import current_app, g
 from sqlalchemy.orm import Session
 
-from app.context import AppContext
+from src.context import AppContext
 
 
 def open_session() -> None:

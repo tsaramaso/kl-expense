@@ -1,8 +1,8 @@
 # app/wsgi.py
 
-from app.config import DATABASE_PATH, LOG_DIR
-from app.context import AppContext
-from app.flask_app import create_app
+from src.config import DATABASE_PATH, LOG_DIR
+from src.context import AppContext
+from src.flask_app import create_app
 
 _CTX = AppContext.init_app(DATABASE_PATH, LOG_DIR)
 
