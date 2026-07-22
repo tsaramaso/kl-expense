@@ -15,10 +15,12 @@ class DirectionType(StrEnum):
     INCOME = auto()
     EXPENSE = auto()
 
+
 class GroupType(StrEnum):
     HOME = auto()
     KL = auto()
     OTHER = auto()
+
 
 class CategoryType(StrEnum):
     KL_ITEM = auto()

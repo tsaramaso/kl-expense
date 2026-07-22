@@ -14,7 +14,10 @@ def build_parser() -> ArgumentParser:
     add_parser.add_argument("name", help="Display name")
     list_parser = subparsers.add_parser("list", help="List user codes")
     list_parser.add_argument(
-        "--all", action="store_true", dest="show_inactive", help="Include deactivated users"
+        "--all",
+        action="store_true",
+        dest="show_inactive",
+        help="Include deactivated users",
     )
 
     remove_parser = subparsers.add_parser("remove", help="Deactivate a user code")

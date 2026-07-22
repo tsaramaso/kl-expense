@@ -33,6 +33,7 @@ def list_users(
                 f"{user.uuid}  {user.name or ''}  (created {user.created_at}){status}"
             )
 
+
 def remove_user(session_maker: sessionmaker[Session], target_uuid: str) -> None:
     with session_maker() as session:
         user = session.get(User, target_uuid)
