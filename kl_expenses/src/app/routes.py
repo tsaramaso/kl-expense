@@ -10,7 +10,7 @@ from flask import (
 from loguru import logger
 
 from src.auth import current_user, login_required
-from src.db import get_session
+from src.db.session import get_session
 from src.app.models import CategoryType, DirectionType, GroupType, Operation, User
 
 bp = Blueprint("main", __name__)

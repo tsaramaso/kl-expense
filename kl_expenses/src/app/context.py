@@ -4,7 +4,7 @@ from sqlalchemy import Engine
 from sqlalchemy.orm import Session, sessionmaker
 
 from src.logger import configure_logging
-from src.db import init_db_engine, make_session
+from src.db.init import init_db_engine, make_session
 
 
 @dataclass(frozen=True)

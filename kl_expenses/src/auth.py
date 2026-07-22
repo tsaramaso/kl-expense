@@ -4,7 +4,7 @@ from typing import Callable
 
 from flask import redirect, session as flask_session, url_for
 
-from src.db import get_session
+from src.db.session import get_session
 from src.app.models import User
 
 

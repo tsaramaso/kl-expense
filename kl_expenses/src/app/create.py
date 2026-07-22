@@ -3,7 +3,7 @@ from flask import Flask
 
 from src.config import FORCE_SECURE_COOKIE, SECRET_KEY
 from src.app.context import AppContext
-from src.db import close_session, open_session
+from src.db.session import close_session, open_session
 from src.app.routes import bp
 
 
