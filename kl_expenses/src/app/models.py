@@ -57,10 +57,14 @@ class Operation(Base):
 
     amount: Mapped[int] = mapped_column(nullable=False)
     direction: Mapped[DirectionType] = mapped_column(
-        SAEnum(DirectionType), nullable=False
+        SAEnum(DirectionType, values_callable=True), nullable=False
     )
-    category: Mapped[CategoryType] = mapped_column(SAEnum(CategoryType), nullable=False)
-    group: Mapped[GroupType] = mapped_column(SAEnum(GroupType), nullable=False)
+    category: Mapped[CategoryType] = mapped_column(
+        SAEnum(CategoryType, values_callable=True), nullable=False
+    )
+    group: Mapped[GroupType] = mapped_column(
+        SAEnum(GroupType, values_callable=True), nullable=False
+    )
     comment: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
