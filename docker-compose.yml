@@ -1,0 +1,11 @@
+services:
+  expense-app:
+    build: ./kl_expenses
+    container_name: expense-kl_expenses
+    restart: unless-stopped
+    ports:
+      - "8420:8420"
+    env_file:
+      - .env
+    volumes:
+      - ./data:/app/data
