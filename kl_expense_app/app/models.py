@@ -42,12 +42,12 @@ class User(Base):
         default=lambda: datetime.now(timezone.utc)
     )
 
-    expenses: Mapped[list["Expense"]] = relationship(
+    expenses: Mapped[list["Operation"]] = relationship(
         back_populates="user", cascade="all, delete-orphan"
     )
 
 
-class Expense(Base):
+class Operation(Base):
     __tablename__ = "expenses"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
