@@ -57,13 +57,20 @@ class Operation(Base):
 
     amount: Mapped[int] = mapped_column(nullable=False)
     direction: Mapped[DirectionType] = mapped_column(
-        SAEnum(DirectionType, values_callable=True), nullable=False
+        SAEnum(
+            DirectionType, values_callable=lambda enum_cls: [e.value for e in enum_cls]
+        ),
+        nullable=False,
     )
     category: Mapped[CategoryType] = mapped_column(
-        SAEnum(CategoryType, values_callable=True), nullable=False
+        SAEnum(
+            CategoryType, values_callable=lambda enum_cls: [e.value for e in enum_cls]
+        ),
+        nullable=False,
     )
     group: Mapped[GroupType] = mapped_column(
-        SAEnum(GroupType, values_callable=True), nullable=False
+        SAEnum(GroupType, values_callable=lambda enum_cls: [e.value for e in enum_cls]),
+        nullable=False,
     )
     comment: Mapped[str | None] = mapped_column(Text, nullable=True)
 
