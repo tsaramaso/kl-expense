@@ -10,7 +10,7 @@ def open_session() -> None:
     g.db = ctx.session_factory()
 
 
-def close_session():
+def close_session(exception: BaseException | None = None) -> None:
     db = g.pop("db", None)
     if db is not None:
         db.close()
