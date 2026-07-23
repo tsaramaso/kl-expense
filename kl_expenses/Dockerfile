@@ -36,6 +36,11 @@ COPY . /app
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked
 
+# data dir for the sqlite file + logs (mounted as a volume in compose).
+# Created and chowned as root, before switching to the non-root user,
+# so the app can actually write to it at runtime.
+RUN mkdir -p /app/data && chown -R nonroot:nonroot /app
+
 # Place executables in the environment at the front of the path
 ENV PATH="/app/.venv/bin:$PATH"
 
@@ -45,9 +50,7 @@ ENTRYPOINT []
 # Use the non-root user to run our application
 USER nonroot
 
-# Run the FastAPI application by default
-# Uses `uv run` to sync dependencies on startup, respecting UV_NO_DEV
-# Uses `fastapi dev` to enable hot-reloading when the `watch` sync occurs
-# Uses `--host 0.0.0.0` to allow access from outside the container
-# Note in production, you should use `fastapi run` instead
-CMD ["uv","run","gunicorn", "--bind", "0.0.0.0:8420", "--workers", "2", "--timeout", "30", "kl_expenses:wsgi"]
+EXPOSE 8420
+
+# src.wsgi:APP -- the Flask WSGI app object, built once at import time
+CMD ["uv", "run", "gunicorn", "--bind", "0.0.0.0:8420", "--workers", "2", "--timeout", "30", "src.wsgi:APP"]
