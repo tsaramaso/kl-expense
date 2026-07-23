@@ -16,5 +16,6 @@ dev = [
     "black>=26.5.1",
     "ipython>=9.15.0",
     "mypy>=2.3.0",
+    "pre-commit>=4.6.1",
     "ruff>=0.15.22",
 ]
