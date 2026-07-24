@@ -1,6 +1,6 @@
 services:
   expense-app:
-    build: ./kl_expenses
+    image: ghcr.io/tsaramaso/kl-expenses:latest
     container_name: expense-app
     restart: unless-stopped
     ports:
