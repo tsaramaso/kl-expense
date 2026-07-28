@@ -56,7 +56,7 @@ class User(Base):
 
 
 class Operation(Base):
-    __tablename__ = "expenses"
+    __tablename__ = "operations"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     user_uuid: Mapped[str] = mapped_column(ForeignKey("users.uuid"), nullable=False)
