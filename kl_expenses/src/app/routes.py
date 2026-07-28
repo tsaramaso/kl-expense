@@ -104,15 +104,16 @@ def insert_expense():
     except ValueError:
         errors.append("Choose a valid category.")
 
-    # expense_type only applies to expense-direction rows; anything submitted
-    # for an income row is ignored rather than validated, since it's
-    # meaningless there regardless of what the form sent.
+    # expense_type is required whenever direction=EXPENSE (pick OTHER for
+    # anything that doesn't fit a more specific type) and meaningless
+    # otherwise, so it's ignored entirely for income rows regardless of
+    # what the form sent.
     expense_type = None
-    if direction == DirectionType.EXPENSE and expense_type_raw:
+    if direction == DirectionType.EXPENSE:
         try:
             expense_type = ExpenseType(expense_type_raw)
         except ValueError:
-            errors.append("Choose a valid expense type.")
+            errors.append("Choose an expense type (pick Other if unsure).")
 
     # related_user_uuid is optional regardless of category; if provided,
     # it must be a real, active user.
@@ -123,6 +124,15 @@ def insert_expense():
             errors.append("Choose a valid user to flag this to.")
         else:
             related_user_uuid = related_user.uuid
+
+    # Category=USER without a chosen related user is ambiguous — who is it
+    # for? Require a comment instead in that case, so there's at least a
+    # human-readable trail. Client-side JS blocks this too, but this check
+    # is the one that actually matters since forms can be posted directly.
+    if category == CategoryType.USER and related_user_uuid is None and comment is None:
+        errors.append(
+            "Category is User but no one is selected — add a comment, or pick a user."
+        )
 
     if errors:
         return (

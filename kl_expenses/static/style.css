@@ -149,3 +149,13 @@ button:active {
   padding: 10px 12px;
   margin: 0 0 12px;
 }
+
+.hidden {
+  display: none;
+}
+
+.hint {
+  font-size: 0.8rem;
+  color: var(--muted);
+  margin: 4px 0 0;
+}
