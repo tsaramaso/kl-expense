@@ -88,6 +88,6 @@ class Operation(Base):
     )
 
     user: Mapped["User"] = relationship(
-        back_populates="expenses", foreign_keys=[user_uuid]
+        back_populates="operations", foreign_keys=[user_uuid]
     )
     related_user: Mapped["User | None"] = relationship(foreign_keys=[related_user_uuid])
