@@ -48,7 +48,7 @@ class User(Base):
         default=lambda: datetime.now(timezone.utc)
     )
 
-    expenses: Mapped[list["Operation"]] = relationship(
+    operations: Mapped[list["Operation"]] = relationship(
         back_populates="user",
         cascade="all, delete-orphan",
         foreign_keys="Operation.user_uuid",

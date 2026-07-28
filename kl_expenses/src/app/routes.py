@@ -75,7 +75,7 @@ def insert_page():
 
 @bp.route("/insert", methods=["POST"])
 @login_required
-def insert_expense():
+def insert_operation():
     user = current_user()
     form = request.form
     errors = []
@@ -154,7 +154,7 @@ def insert_expense():
             400,
         )
 
-    expense = Operation(
+    operation = Operation(
         user_uuid=user.uuid,
         related_user_uuid=related_user_uuid,
         amount=amount,
@@ -163,10 +163,10 @@ def insert_expense():
         expense_type=expense_type,
         comment=comment,
     )
-    db_session.add(expense)
+    db_session.add(operation)
     db_session.commit()
     logger.info(
-        f"Expense recorded: user={user.uuid} amount={amount} "
+        f"Operation recorded: user={user.uuid} amount={amount} "
         f"direction={direction} category={category} expense_type={expense_type} "
         f"related_user={related_user_uuid}"
     )

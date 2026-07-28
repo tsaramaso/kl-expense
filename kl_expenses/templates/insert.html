@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Expenses — Add entry</title>
+  <title>Operations — Add entry</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
@@ -33,7 +33,7 @@
         </ul>
       {% endif %}
 
-      <form method="post" action="{{ url_for('main.insert_expense') }}">
+  <form method="post" action="{{ url_for('main.insert_operation') }}">
         <label for="amount">Amount</label>
         <input
           type="number"
