@@ -37,6 +37,10 @@ kl_expenses/
 ├── static/style.css
 └── templates/{login,insert}.html
 
+kl_expenses/alembic/
+├── env.py                 # target_metadata=Base.metadata, render_as_batch=True (sqlite)
+└── versions/              # migration scripts — `baseline` stamps the redesigned schema
+
 docker-compose.yml          # repo root — image: ghcr.io/tsaramaso/kl-expenses:latest
 .github/workflows/
 ├── deploy.yml              # build + push to GHCR, then deploy to VPS
@@ -85,6 +89,15 @@ export DATABASE_PATH=data/expenses.db
 export LOG_DIR=data/logs
 ```
 
+Schema is Alembic-owned — `init_db_engine()` no longer calls
+`create_all()`, so a fresh clone has **no tables at all** until you run
+migrations:
+
+```bash
+cd kl_expenses
+uv run alembic upgrade head    # required before first run, and after pulling any migration
+```
+
 ### Running locally without Docker
 
 ```bash
@@ -111,6 +124,7 @@ instead of `image: ghcr.io/...` (don't commit that change):
 mkdir -p data
 sudo chown -R 999:999 data   # container runs as non-root UID/GID 999
 docker compose build
+docker compose run --rm expense-app uv run alembic upgrade head   # required — no create_all() anymore
 docker compose up
 ```
 
@@ -155,6 +169,45 @@ traffic — it writes to the same SQLite file the web app uses, via the
 bind-mounted `/opt/kl-expenses/data` volume, which survives container
 restarts and redeploys.
 
+## Schema & migrations
+
+`Operation` records one income or expense row per user. Three enums,
+each an independent dimension (deliberately not overlapping):
+
+- `DirectionType` — `INCOME` / `EXPENSE`
+- `CategoryType` — `KL` / `HOME` / `USER` / `OTHER` — who/what it's for
+- `ExpenseType` — `GROCERIES`, `UTILITIES`, `OTHER`, `MATERIAL`, `FOOD`,
+  `RENT`, `BILL`, `SALARY`, `PERSONAL`, `FUEL` — nullable, only
+  meaningful when `direction=EXPENSE`
+
+`Operation` also has `related_user_uuid` — a second, independent FK to
+`users.uuid`, nullable. Distinct from `user_uuid` (who logged the entry):
+this is who the entry is *for* (self or one of the other users).
+
+This replaced an earlier `group` + `category` design that conflated "who
+paid" with "what it was spent on." Migrating the live data wasn't a
+mechanical column rename — see the schema history in git for how the old
+rows were remapped.
+
+**Schema changes go through Alembic**, not hand-edited SQL:
+```bash
+cd kl_expenses
+uv run alembic revision --autogenerate -m "short description"
+# review the generated file carefully, especially renames and new
+# NOT NULL columns — autogenerate doesn't always get intent right
+uv run alembic upgrade head
+```
+`alembic/env.py` sets `render_as_batch=True` on both the offline and
+online configure calls — required, because SQLite can't do most
+`ALTER TABLE` forms directly; Alembic instead rebuilds the table under
+the hood via a temp-table swap.
+
+**Two FKs from `Operation` to `users.uuid`** (`user_uuid` and
+`related_user_uuid`) means both `Operation.user` and `User.expenses`
+need an explicit `foreign_keys=` argument on their `relationship()` —
+leaving either one off raises `AmbiguousForeignKeysError` at import
+time, since SQLAlchemy can't infer which FK each relationship means.
+
 ## What's done — GitHub side
 
 - **Repo secrets** (Settings → Secrets and variables → Actions):
@@ -169,8 +222,14 @@ restarts and redeploys.
      to GitHub Container Registry, using the automatic `GITHUB_TOKEN`
      (no PAT needed for this part).
   2. `deploy` (needs `build-and-push`) — scp's the repo's
-     `docker-compose.yml` to `/opt/kl-expenses/` on the VPS, then SSHes
-     in and runs `docker compose pull && docker compose up -d`.
+     `docker-compose.yml` to `/opt/kl-expenses/` on the VPS, then three
+     separate SSH steps (not chained with `&&`, so a failure at any
+     stage stops the pipeline cleanly instead of limping forward):
+     1. `docker compose pull`
+     2. `docker compose run --rm expense-app uv run alembic upgrade head`
+        — a throwaway container, not `exec` into the running one; right
+        after `pull`, the *running* container is still on the old image
+     3. `docker compose up -d`
 - **`.github/workflows/lint.yml`** — runs `black --check`, `ruff check`,
   `mypy` on every PR into `main`.
 - **Branch protection on `main`** (Settings → Branches): PR required,
@@ -240,7 +299,7 @@ restarts and redeploys.
   module-level `APP`/context is the one legitimate case of module-level
   state — it's the WSGI contract gunicorn requires.
 - **Enums are DB-enforced** (`SAEnum` with `values_callable`) —
-  `DirectionType`/`CategoryType`/`GroupType` values are validated at the
+  `DirectionType`/`CategoryType`/`ExpenseType` values are validated at the
   database level, not just in Python.
 - **Docker binds to `127.0.0.1:8420` only**, not `0.0.0.0` — nginx is the
   only thing reachable from outside the VPS, proxying over loopback.
@@ -300,6 +359,27 @@ restarts and redeploys.
   fresh runner with an empty filesystem. Any job that needs repo files
   (e.g. to scp `docker-compose.yml`) needs its own `actions/checkout`
   step, even if an earlier job already checked out the same repo.
+- **SQLAlchemy's `SAEnum` on SQLite does not generate a `CHECK`
+  constraint by default** — `create_constraint` has defaulted to `False`
+  for non-native enum types since SQLAlchemy 1.4. The real (small)
+  residual risk is a Python-side `LookupError` on read if an enum member
+  is removed/renamed while old rows still hold it — purely additive
+  enum changes are free.
+- **`sudo` doesn't inherit the calling shell's `PATH`** — `sudo uv run
+  ...` fails with `command not found` even when `uv` works fine
+  unprivileged. Don't chase `sudo` for a `uv`/venv-based command; fix
+  the actual permission/ownership problem on the directory instead.
+  `chmod 777` "fixes" it too, but isn't the correct fix — `chown` to the
+  right user, keep permissions at `755` or tighter.
+- **Manual file transfers to the VPS need a re-`chown`** — `scp` writes
+  as the connecting user (`deploy`), not `999`. After copying anything
+  into `data/` by hand (e.g. swapping in a rebuilt sqlite file), `chown
+  999:999` it again or the container can't write to it.
+- **Host and container UID/GID numbers matching is what matters** for
+  bind-mount permissions — the *name* attached to that number (e.g. some
+  unrelated system group happening to also be GID 999 on the host) is
+  irrelevant; container and host have separate `/etc/group` tables, only
+  the numeric ID crosses the bind-mount boundary.
 
 ## Not done yet
 
