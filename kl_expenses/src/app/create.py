@@ -1,4 +1,6 @@
 # src/app/create.py
+from datetime import timedelta
+
 from flask import Flask
 from werkzeug.middleware.proxy_fix import ProxyFix
 
@@ -20,6 +22,7 @@ def create_app(ctx: AppContext) -> Flask:
     app.config["SESSION_COOKIE_HTTPONLY"] = True
     app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
     app.config["SESSION_COOKIE_SECURE"] = FORCE_SECURE_COOKIE
+    app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(days=100)
 
     app.before_request(open_session)
     app.teardown_appcontext(close_session)
