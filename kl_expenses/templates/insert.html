@@ -10,9 +10,12 @@
   <main class="page">
     <header class="topbar">
       <span class="user">{{ user_name }}</span>
-      <form method="post" action="{{ url_for('main.logout') }}">
-        <button type="submit" class="link-button">Log out</button>
-      </form>
+      <span>
+        <a class="nav-link" href="{{ url_for('main.history_page') }}">History</a>
+        <form method="post" action="{{ url_for('main.logout') }}" style="display:inline">
+          <button type="submit" class="link-button">Log out</button>
+        </form>
+      </span>
     </header>
 
     <div class="card">

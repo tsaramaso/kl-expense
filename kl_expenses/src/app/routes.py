@@ -1,4 +1,6 @@
 # app/routes.py
+from datetime import datetime, timedelta, timezone
+
 from flask import (
     Blueprint,
     redirect,
@@ -15,6 +17,8 @@ from src.db.session import get_session
 from src.app.models import CategoryType, DirectionType, ExpenseType, Operation, User
 
 bp = Blueprint("main", __name__)
+
+RANGE_WINDOWS = {"week": 7, "month": 30}
 
 
 def _active_users(db_session):
@@ -167,3 +171,55 @@ def insert_expense():
         f"related_user={related_user_uuid}"
     )
     return redirect(url_for("main.insert_page", message="Saved."))
+
+
+@bp.route("/history", methods=["GET"])
+@login_required
+def history_page():
+    user = current_user()
+    db_session = get_session()
+
+    view_range = request.args.get("range", "week")
+    if view_range not in ("week", "month", "all"):
+        view_range = "week"
+
+    stmt = select(Operation).order_by(Operation.created_at.desc())
+    if view_range in RANGE_WINDOWS:
+        # Stored created_at values are tz-aware UTC at write time, but
+        # SQLite strips the offset on storage (naive string, no "+00:00").
+        # Binding a tz-aware cutoff here would compare mismatched string
+        # shapes and silently misorder — strip tzinfo so the bound cutoff
+        # matches the stored shape exactly.
+        cutoff = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(
+            days=RANGE_WINDOWS[view_range]
+        )
+        stmt = stmt.where(Operation.created_at >= cutoff)
+
+    operations = db_session.scalars(stmt).all()
+
+    return render_template(
+        "history.html",
+        user_name=user.name or user.uuid[:8],
+        operations=operations,
+        view_range=view_range,
+    )
+
+
+@bp.route("/history/<int:operation_id>/toggle", methods=["POST"])
+@login_required
+def toggle_operation(operation_id):
+    db_session = get_session()
+    operation = db_session.get(Operation, operation_id)
+
+    if operation is not None:
+        operation.is_active = not operation.is_active
+        db_session.commit()
+        logger.info(
+            f"Operation {'restored' if operation.is_active else 'soft-deleted'}: "
+            f"id={operation_id} by user={current_user().uuid}"
+        )
+
+    view_range = request.form.get("range", "week")
+    if view_range not in ("week", "month", "all"):
+        view_range = "week"
+    return redirect(url_for("main.history_page", range=view_range))
