@@ -8,6 +8,7 @@ from src.config import FORCE_SECURE_COOKIE, SECRET_KEY, STATIC_FOLDER, TEMPLATE_
 from src.app.context import AppContext
 from src.db.session import close_session, open_session
 from src.app.routes import bp
+from src.app.filters import register_filters
 
 
 def create_app(ctx: AppContext) -> Flask:
@@ -28,5 +29,7 @@ def create_app(ctx: AppContext) -> Flask:
     app.teardown_appcontext(close_session)
 
     app.register_blueprint(bp)
+
+    register_filters(app)
 
     return app
