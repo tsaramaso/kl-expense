@@ -8,12 +8,18 @@ from flask import (
     url_for,
 )
 from loguru import logger
+from sqlalchemy import select
 
 from src.auth import current_user, login_required
 from src.db.session import get_session
-from src.app.models import CategoryType, DirectionType, GroupType, Operation, User
+from src.app.models import CategoryType, DirectionType, ExpenseType, Operation, User
 
 bp = Blueprint("main", __name__)
+
+
+def _active_users(db_session):
+    stmt = select(User).where(User.is_active.is_(True)).order_by(User.created_at)
+    return db_session.scalars(stmt).all()
 
 
 @bp.route("/", methods=["GET"])
@@ -49,6 +55,7 @@ def logout():
 @login_required
 def insert_page():
     user = current_user()
+    db_session = get_session()
     return render_template(
         "insert.html",
         user_name=user.name or user.uuid[:8],
@@ -57,7 +64,8 @@ def insert_page():
         form=None,
         directions=list(DirectionType),
         categories=list(CategoryType),
-        groups=list(GroupType),
+        expense_types=list(ExpenseType),
+        users=_active_users(db_session),
     )
 
 
@@ -67,11 +75,13 @@ def insert_expense():
     user = current_user()
     form = request.form
     errors = []
+    db_session = get_session()
 
     amount_raw = form.get("amount", "")
     direction_raw = form.get("direction", "")
     category_raw = form.get("category", "")
-    group_raw = form.get("group", "")
+    expense_type_raw = form.get("expense_type", "")
+    related_user_uuid_raw = form.get("related_user_uuid", "").strip()
     comment = form.get("comment", "").strip() or None
 
     amount = None
@@ -94,11 +104,25 @@ def insert_expense():
     except ValueError:
         errors.append("Choose a valid category.")
 
-    group = None
-    try:
-        group = GroupType(group_raw)
-    except ValueError:
-        errors.append("Choose a valid group.")
+    # expense_type only applies to expense-direction rows; anything submitted
+    # for an income row is ignored rather than validated, since it's
+    # meaningless there regardless of what the form sent.
+    expense_type = None
+    if direction == DirectionType.EXPENSE and expense_type_raw:
+        try:
+            expense_type = ExpenseType(expense_type_raw)
+        except ValueError:
+            errors.append("Choose a valid expense type.")
+
+    # related_user_uuid is optional regardless of category; if provided,
+    # it must be a real, active user.
+    related_user_uuid = None
+    if related_user_uuid_raw:
+        related_user = db_session.get(User, related_user_uuid_raw)
+        if related_user is None or not related_user.is_active:
+            errors.append("Choose a valid user to flag this to.")
+        else:
+            related_user_uuid = related_user.uuid
 
     if errors:
         return (
@@ -110,24 +134,26 @@ def insert_expense():
                 form=form,
                 directions=list(DirectionType),
                 categories=list(CategoryType),
-                groups=list(GroupType),
+                expense_types=list(ExpenseType),
+                users=_active_users(db_session),
             ),
             400,
         )
 
-    db_session = get_session()
     expense = Operation(
         user_uuid=user.uuid,
+        related_user_uuid=related_user_uuid,
         amount=amount,
         direction=direction,
         category=category,
-        group=group,
+        expense_type=expense_type,
         comment=comment,
     )
     db_session.add(expense)
     db_session.commit()
     logger.info(
         f"Expense recorded: user={user.uuid} amount={amount} "
-        f"direction={direction} category={category} group={group}"
+        f"direction={direction} category={category} expense_type={expense_type} "
+        f"related_user={related_user_uuid}"
     )
     return redirect(url_for("main.insert_page", message="Saved."))

@@ -16,20 +16,24 @@ class DirectionType(StrEnum):
     EXPENSE = auto()
 
 
-class GroupType(StrEnum):
-    HOME = auto()
-    KL = auto()
-    OTHER = auto()
-
-
 class CategoryType(StrEnum):
-    KL_ITEM = auto()
-    KL_SALARY = auto()
-    KL_OTHER = auto()
-    KL_EXPENSE = auto()
-    GROCERIES = auto()
-    RESTAURANT = auto()
+    KL = auto()
+    HOME = auto()
+    USER = auto()
     OTHER = auto()
+
+
+class ExpenseType(StrEnum):
+    GROCERIES = auto()
+    UTILITIES = auto()
+    OTHER = auto()
+    MATERIAL = auto()
+    FOOD = auto()
+    RENT = auto()
+    BILL = auto()
+    SALARY = auto()
+    PERSONAL = auto()
+    FUEL = auto()
 
 
 class User(Base):
@@ -45,7 +49,9 @@ class User(Base):
     )
 
     expenses: Mapped[list["Operation"]] = relationship(
-        back_populates="user", cascade="all, delete-orphan"
+        back_populates="user",
+        cascade="all, delete-orphan",
+        foreign_keys="Operation.user_uuid",
     )
 
 
@@ -54,23 +60,22 @@ class Operation(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     user_uuid: Mapped[str] = mapped_column(ForeignKey("users.uuid"), nullable=False)
+    related_user_uuid: Mapped[str | None] = mapped_column(
+        ForeignKey("users.uuid"), nullable=True
+    )
 
     amount: Mapped[int] = mapped_column(nullable=False)
     direction: Mapped[DirectionType] = mapped_column(
-        SAEnum(
-            DirectionType, values_callable=lambda enum_cls: [e.value for e in enum_cls]
-        ),
+        SAEnum(DirectionType, values_callable=lambda e: [x.value for x in e]),
         nullable=False,
     )
     category: Mapped[CategoryType] = mapped_column(
-        SAEnum(
-            CategoryType, values_callable=lambda enum_cls: [e.value for e in enum_cls]
-        ),
+        SAEnum(CategoryType, values_callable=lambda e: [x.value for x in e]),
         nullable=False,
     )
-    group: Mapped[GroupType] = mapped_column(
-        SAEnum(GroupType, values_callable=lambda enum_cls: [e.value for e in enum_cls]),
-        nullable=False,
+    expense_type: Mapped[ExpenseType | None] = mapped_column(
+        SAEnum(ExpenseType, values_callable=lambda e: [x.value for x in e]),
+        nullable=True,
     )
     comment: Mapped[str | None] = mapped_column(Text, nullable=True)
 
@@ -78,4 +83,7 @@ class Operation(Base):
         default=lambda: datetime.now(timezone.utc)
     )
 
-    user: Mapped["User"] = relationship(back_populates="expenses")
+    user: Mapped["User"] = relationship(
+        back_populates="expenses", foreign_keys=[user_uuid]
+    )
+    related_user: Mapped["User | None"] = relationship(foreign_keys=[related_user_uuid])
