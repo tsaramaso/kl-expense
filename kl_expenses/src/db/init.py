@@ -1,9 +1,9 @@
 # app/init.py
 from pathlib import Path
-from sqlalchemy import Engine, create_engine
+from sqlalchemy import Engine, create_engine, event
 from sqlalchemy.orm import Session, sessionmaker
-
-from src.app.models import Base
+from sqlite3 import Connection as SQLite3Connection
+from sqlalchemy.pool import ConnectionPoolEntry
 
 
 def make_session(engine: Engine) -> sessionmaker[Session]:
@@ -11,7 +11,16 @@ def make_session(engine: Engine) -> sessionmaker[Session]:
     return sessionmaker(bind=engine, expire_on_commit=False)
 
 
+def _set_sqlite_pragmas(
+    dbapi_connection: SQLite3Connection, connection_record: ConnectionPoolEntry
+) -> None:
+    cursor = dbapi_connection.cursor()
+    cursor.execute("PRAGMA journal_mode=WAL")
+    cursor.execute("PRAGMA busy_timeout=5000")
+    cursor.close()
+
+
 def init_db_engine(db_path: Path) -> Engine:
     engine = create_engine(f"sqlite:///{db_path}")
-    Base.metadata.create_all(engine)
+    event.listen(engine, "connect", _set_sqlite_pragmas)
     return engine

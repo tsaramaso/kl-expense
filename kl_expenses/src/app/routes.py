@@ -1,4 +1,6 @@
 # app/routes.py
+from datetime import datetime, timedelta, timezone
+
 from flask import (
     Blueprint,
     redirect,
@@ -8,12 +10,20 @@ from flask import (
     url_for,
 )
 from loguru import logger
+from sqlalchemy import select
 
 from src.auth import current_user, login_required
 from src.db.session import get_session
-from src.app.models import CategoryType, DirectionType, GroupType, Operation, User
+from src.app.models import CategoryType, DirectionType, ExpenseType, Operation, User
 
 bp = Blueprint("main", __name__)
+
+RANGE_WINDOWS = {"week": 7, "month": 30}
+
+
+def _active_users(db_session):
+    stmt = select(User).where(User.is_active.is_(True)).order_by(User.created_at)
+    return db_session.scalars(stmt).all()
 
 
 @bp.route("/", methods=["GET"])
@@ -49,6 +59,7 @@ def logout():
 @login_required
 def insert_page():
     user = current_user()
+    db_session = get_session()
     return render_template(
         "insert.html",
         user_name=user.name or user.uuid[:8],
@@ -57,7 +68,8 @@ def insert_page():
         form=None,
         directions=list(DirectionType),
         categories=list(CategoryType),
-        groups=list(GroupType),
+        expense_types=list(ExpenseType),
+        users=_active_users(db_session),
     )
 
 
@@ -67,11 +79,13 @@ def insert_expense():
     user = current_user()
     form = request.form
     errors = []
+    db_session = get_session()
 
     amount_raw = form.get("amount", "")
     direction_raw = form.get("direction", "")
     category_raw = form.get("category", "")
-    group_raw = form.get("group", "")
+    expense_type_raw = form.get("expense_type", "")
+    related_user_uuid_raw = form.get("related_user_uuid", "").strip()
     comment = form.get("comment", "").strip() or None
 
     amount = None
@@ -94,11 +108,35 @@ def insert_expense():
     except ValueError:
         errors.append("Choose a valid category.")
 
-    group = None
-    try:
-        group = GroupType(group_raw)
-    except ValueError:
-        errors.append("Choose a valid group.")
+    # expense_type is required whenever direction=EXPENSE (pick OTHER for
+    # anything that doesn't fit a more specific type) and meaningless
+    # otherwise, so it's ignored entirely for income rows regardless of
+    # what the form sent.
+    expense_type = None
+    if direction == DirectionType.EXPENSE:
+        try:
+            expense_type = ExpenseType(expense_type_raw)
+        except ValueError:
+            errors.append("Choose an expense type (pick Other if unsure).")
+
+    # related_user_uuid is optional regardless of category; if provided,
+    # it must be a real, active user.
+    related_user_uuid = None
+    if related_user_uuid_raw:
+        related_user = db_session.get(User, related_user_uuid_raw)
+        if related_user is None or not related_user.is_active:
+            errors.append("Choose a valid user to flag this to.")
+        else:
+            related_user_uuid = related_user.uuid
+
+    # Category=USER without a chosen related user is ambiguous — who is it
+    # for? Require a comment instead in that case, so there's at least a
+    # human-readable trail. Client-side JS blocks this too, but this check
+    # is the one that actually matters since forms can be posted directly.
+    if category == CategoryType.USER and related_user_uuid is None and comment is None:
+        errors.append(
+            "Category is User but no one is selected — add a comment, or pick a user."
+        )
 
     if errors:
         return (
@@ -110,24 +148,78 @@ def insert_expense():
                 form=form,
                 directions=list(DirectionType),
                 categories=list(CategoryType),
-                groups=list(GroupType),
+                expense_types=list(ExpenseType),
+                users=_active_users(db_session),
             ),
             400,
         )
 
-    db_session = get_session()
     expense = Operation(
         user_uuid=user.uuid,
+        related_user_uuid=related_user_uuid,
         amount=amount,
         direction=direction,
         category=category,
-        group=group,
+        expense_type=expense_type,
         comment=comment,
     )
     db_session.add(expense)
     db_session.commit()
     logger.info(
         f"Expense recorded: user={user.uuid} amount={amount} "
-        f"direction={direction} category={category} group={group}"
+        f"direction={direction} category={category} expense_type={expense_type} "
+        f"related_user={related_user_uuid}"
     )
     return redirect(url_for("main.insert_page", message="Saved."))
+
+
+@bp.route("/history", methods=["GET"])
+@login_required
+def history_page():
+    user = current_user()
+    db_session = get_session()
+
+    view_range = request.args.get("range", "week")
+    if view_range not in ("week", "month", "all"):
+        view_range = "week"
+
+    stmt = select(Operation).order_by(Operation.created_at.desc())
+    if view_range in RANGE_WINDOWS:
+        # Stored created_at values are tz-aware UTC at write time, but
+        # SQLite strips the offset on storage (naive string, no "+00:00").
+        # Binding a tz-aware cutoff here would compare mismatched string
+        # shapes and silently misorder — strip tzinfo so the bound cutoff
+        # matches the stored shape exactly.
+        cutoff = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(
+            days=RANGE_WINDOWS[view_range]
+        )
+        stmt = stmt.where(Operation.created_at >= cutoff)
+
+    operations = db_session.scalars(stmt).all()
+
+    return render_template(
+        "history.html",
+        user_name=user.name or user.uuid[:8],
+        operations=operations,
+        view_range=view_range,
+    )
+
+
+@bp.route("/history/<int:operation_id>/toggle", methods=["POST"])
+@login_required
+def toggle_operation(operation_id):
+    db_session = get_session()
+    operation = db_session.get(Operation, operation_id)
+
+    if operation is not None:
+        operation.is_active = not operation.is_active
+        db_session.commit()
+        logger.info(
+            f"Operation {'restored' if operation.is_active else 'soft-deleted'}: "
+            f"id={operation_id} by user={current_user().uuid}"
+        )
+
+    view_range = request.form.get("range", "week")
+    if view_range not in ("week", "month", "all"):
+        view_range = "week"
+    return redirect(url_for("main.history_page", range=view_range))

@@ -48,7 +48,7 @@ jobs:
           source: "docker-compose.yml"
           target: "/opt/kl-expenses"
 
-      - name: SSH and redeploy
+      - name: Pull new image
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.VPS_HOST }}
@@ -57,4 +57,23 @@ jobs:
           script: |
             cd /opt/kl-expenses
             docker compose pull
+
+      - name: Run DB migrations
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: deploy
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            cd /opt/kl-expenses
+            docker compose run --rm expense-app uv run alembic upgrade head
+
+      - name: Restart app
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: deploy
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            cd /opt/kl-expenses
             docker compose up -d

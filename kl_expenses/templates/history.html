@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Expenses — History</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <main class="page">
+    <header class="topbar">
+      <span class="user">{{ user_name }}</span>
+      <span>
+        <a class="nav-link" href="{{ url_for('main.insert_page') }}">Add entry</a>
+        <form method="post" action="{{ url_for('main.logout') }}" style="display:inline">
+          <button type="submit" class="link-button">Log out</button>
+        </form>
+      </span>
+    </header>
+
+    <div class="card">
+      <h1>History</h1>
+
+      <div class="range-tabs">
+        <a href="{{ url_for('main.history_page', range='week') }}"
+           class="{% if view_range == 'week' %}active{% endif %}">This week</a>
+        <a href="{{ url_for('main.history_page', range='month') }}"
+           class="{% if view_range == 'month' %}active{% endif %}">See more (30d)</a>
+        <a href="{{ url_for('main.history_page', range='all') }}"
+           class="{% if view_range == 'all' %}active{% endif %}">Everything</a>
+      </div>
+
+      {% if operations %}
+        <div class="history-list">
+          {% for op in operations %}
+            <div class="history-row {% if not op.is_active %}deleted{% endif %}">
+              <div class="details">
+                <span class="primary">
+                  {{ op.amount }} — {{ op.direction.value.replace('_', ' ')|title }}
+                  {% if not op.is_active %}<span class="badge-deleted">Deleted</span>{% endif %}
+                </span>
+                <span class="muted">
+                  {{ op.created_at.strftime('%Y-%m-%d %H:%M') }} ·
+                  {{ op.category.value.replace('_', ' ')|title }}
+                  {% if op.expense_type %} · {{ op.expense_type.value.replace('_', ' ')|title }}{% endif %}
+                  · logged by {{ op.user.name or op.user.uuid[:8] }}
+                  {% if op.related_user %} · for {{ op.related_user.name or op.related_user.uuid[:8] }}{% endif %}
+                </span>
+                {% if op.comment %}
+                  <span class="muted">“{{ op.comment }}”</span>
+                {% endif %}
+              </div>
+              <form method="post" action="{{ url_for('main.toggle_operation', operation_id=op.id) }}">
+                <input type="hidden" name="range" value="{{ view_range }}">
+                <button type="submit">{{ 'Restore' if not op.is_active else 'Delete' }}</button>
+              </form>
+            </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <p class="empty-state">Nothing to show for this range.</p>
+      {% endif %}
+    </div>
+  </main>
+</body>
+</html>

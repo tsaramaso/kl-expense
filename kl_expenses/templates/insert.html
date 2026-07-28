@@ -10,9 +10,12 @@
   <main class="page">
     <header class="topbar">
       <span class="user">{{ user_name }}</span>
-      <form method="post" action="{{ url_for('main.logout') }}">
-        <button type="submit" class="link-button">Log out</button>
-      </form>
+      <span>
+        <a class="nav-link" href="{{ url_for('main.history_page') }}">History</a>
+        <form method="post" action="{{ url_for('main.logout') }}" style="display:inline">
+          <button type="submit" class="link-button">Log out</button>
+        </form>
+      </span>
     </header>
 
     <div class="card">
@@ -63,15 +66,30 @@
           {% endfor %}
         </select>
 
-        <label for="group">Group</label>
-        <select id="group" name="group" required>
-          <option value="" disabled {% if not form %}selected{% endif %}>Select…</option>
-          {% for g in groups %}
-            <option value="{{ g.value }}" {% if form and form.group == g.value %}selected{% endif %}>
-              {{ g.value.replace('_', ' ')|title }}
-            </option>
-          {% endfor %}
-        </select>
+        <div id="expense-type-field">
+          <label for="expense_type">Expense type</label>
+          <select id="expense_type" name="expense_type">
+            <option value="" disabled {% if not form %}selected{% endif %}>Select…</option>
+            {% for et in expense_types %}
+              <option value="{{ et.value }}" {% if form and form.expense_type == et.value %}selected{% endif %}>
+                {{ et.value.replace('_', ' ')|title }}
+              </option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div id="related-user-field">
+          <label for="related_user_uuid">Flag to user (optional)</label>
+          <select id="related_user_uuid" name="related_user_uuid">
+            <option value="" {% if not form or not form.related_user_uuid %}selected{% endif %}>None</option>
+            {% for u in users %}
+              <option value="{{ u.uuid }}" {% if form and form.related_user_uuid == u.uuid %}selected{% endif %}>
+                {{ u.name or u.uuid[:8] }}
+              </option>
+            {% endfor %}
+          </select>
+          <p class="hint">If category is User and you don't pick someone here, add a comment instead.</p>
+        </div>
 
         <label for="comment">Comment (optional)</label>
         <textarea id="comment" name="comment" rows="2">{{ form.comment if form else '' }}</textarea>
@@ -80,5 +98,50 @@
       </form>
     </div>
   </main>
+
+  <script>
+    (function () {
+      const directionSelect = document.getElementById('direction');
+      const categorySelect = document.getElementById('category');
+      const expenseTypeField = document.getElementById('expense-type-field');
+      const expenseTypeSelect = document.getElementById('expense_type');
+      const relatedUserField = document.getElementById('related-user-field');
+      const relatedUserSelect = document.getElementById('related_user_uuid');
+      const commentField = document.getElementById('comment');
+      const form = document.querySelector('form[action$="/insert"]');
+
+      function syncExpenseType() {
+        const isExpense = directionSelect.value === 'expense';
+        expenseTypeField.classList.toggle('hidden', !isExpense);
+        expenseTypeSelect.required = isExpense;
+        if (!isExpense) {
+          expenseTypeSelect.value = '';
+        }
+      }
+
+      function syncRelatedUser() {
+        const isUserCategory = categorySelect.value === 'user';
+        relatedUserField.classList.toggle('hidden', !isUserCategory);
+        if (!isUserCategory) {
+          relatedUserSelect.value = '';
+        }
+      }
+
+      directionSelect.addEventListener('change', syncExpenseType);
+      categorySelect.addEventListener('change', syncRelatedUser);
+      syncExpenseType();
+      syncRelatedUser();
+
+      form.addEventListener('submit', function (event) {
+        const isUserCategory = categorySelect.value === 'user';
+        const noRelatedUser = !relatedUserSelect.value;
+        const noComment = !commentField.value.trim();
+        if (isUserCategory && noRelatedUser && noComment) {
+          event.preventDefault();
+          alert('Category is User but no one is selected — add a comment, or pick a user.');
+        }
+      });
+    })();
+  </script>
 </body>
 </html>
