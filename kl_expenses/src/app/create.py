@@ -1,4 +1,6 @@
 # src/app/create.py
+from datetime import timedelta
+
 from flask import Flask
 from werkzeug.middleware.proxy_fix import ProxyFix
 
@@ -6,6 +8,7 @@ from src.config import FORCE_SECURE_COOKIE, SECRET_KEY, STATIC_FOLDER, TEMPLATE_
 from src.app.context import AppContext
 from src.db.session import close_session, open_session
 from src.app.routes import bp
+from src.app.filters import register_filters
 
 
 def create_app(ctx: AppContext) -> Flask:
@@ -20,10 +23,13 @@ def create_app(ctx: AppContext) -> Flask:
     app.config["SESSION_COOKIE_HTTPONLY"] = True
     app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
     app.config["SESSION_COOKIE_SECURE"] = FORCE_SECURE_COOKIE
+    app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(days=100)
 
     app.before_request(open_session)
     app.teardown_appcontext(close_session)
 
     app.register_blueprint(bp)
+
+    register_filters(app)
 
     return app

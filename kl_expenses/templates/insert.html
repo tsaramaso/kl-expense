@@ -45,7 +45,12 @@
           required
           value="{{ form.amount if form else '' }}"
         >
-
+        <div class="amount-quick">
+          <button type="button" class="chip-btn" data-add="1000">+1k</button>
+          <button type="button" class="chip-btn" data-add="10000">+10k</button>
+          <button type="button" class="chip-btn" data-add="100000">+100k</button>
+          <button type="button" class="chip-btn" data-add="1000000">+1M</button>
+        </div>
         <label for="direction">Direction</label>
         <select id="direction" name="direction" required>
           <option value="" disabled {% if not form %}selected{% endif %}>Select…</option>
@@ -128,9 +133,20 @@
       }
 
       directionSelect.addEventListener('change', syncExpenseType);
+      const amountInput = document.getElementById('amount');
+      const quickButtons = document.querySelectorAll('.chip-btn[data-add]');
       categorySelect.addEventListener('change', syncRelatedUser);
       syncExpenseType();
       syncRelatedUser();
+
+      quickButtons.forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          const current = parseInt(amountInput.value, 10) || 0;
+          amountInput.value = current + parseInt(btn.dataset.add, 10);
+          amountInput.focus();
+        });
+      });
+      directionSelect.addEventListener('change', syncExpenseType);
 
       form.addEventListener('submit', function (event) {
         const isUserCategory = categorySelect.value === 'user';

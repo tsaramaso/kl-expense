@@ -45,7 +45,7 @@ def login():
 
     flask_session.clear()
     flask_session["uuid"] = user.uuid
-    flask_session.permanent = False
+    flask_session.permanent = True
     return redirect(url_for("main.insert_page"))
 
 
