@@ -370,3 +370,24 @@ button:active {
   width: 100%;
   min-height: 340px;
 }
+
+.topbar .nav-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.nav-btn {
+  display: inline-block;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font-size: 0.82rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.nav-btn:hover {
+  border-color: var(--accent);
+}
