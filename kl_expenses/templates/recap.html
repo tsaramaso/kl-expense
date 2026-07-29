@@ -11,9 +11,9 @@
   <main class="page">
     <header class="topbar">
       <span class="user">{{ user_name }}</span>
-      <span>
-        <a class="nav-link" href="{{ url_for('main.history_page') }}">History</a>
-        <a class="nav-link" href="{{ url_for('main.insert_page') }}">Add entry</a>
+      <span class="nav-actions">
+        <a class="nav-btn" href="{{ url_for('main.history_page') }}">History</a>
+        <a class="nav-btn" href="{{ url_for('main.insert_page') }}">Add entry</a>
         <form method="post" action="{{ url_for('main.logout') }}" style="display:inline">
           <button type="submit" class="link-button">Log out</button>
         </form>
@@ -30,14 +30,32 @@
           <button type="button" class="range-btn" data-range="year">365 days</button>
           <button type="button" class="range-btn" data-range="all">Everything</button>
         </div>
-        <label class="subtype-toggle">
-          <input type="checkbox" id="subtype-toggle">
-          Show expense breakdown
-        </label>
+        <button type="button" class="subtype-toggle" id="subtype-toggle">Breakdown</button>
+      </div>
+
+      <div class="recap-totals">
+        <div class="recap-total recap-total--income">
+          <span class="recap-total__label">Income</span>
+          <span class="recap-total__value" id="income-total">{{ income_total|space_sep }}&nbsp;Ar</span>
+        </div>
+        <div class="recap-total recap-total--expense">
+          <span class="recap-total__label">Expense</span>
+          <span class="recap-total__value" id="expense-total">{{ expense_total|space_sep }}&nbsp;Ar</span>
+        </div>
       </div>
 
       <div id="recap-chart"></div>
       <script type="application/json" id="recap-initial-data">{{ figure_json | safe }}</script>
+      <script type="application/json" id="recap-initial-details">{{ details_json | safe }}</script>
+
+      <div class="details-table" id="details-table">
+        <div class="details-head">
+          <span>Details</span>
+          <span>%</span>
+          <span>Amount</span>
+        </div>
+        <div id="details-rows"></div>
+      </div>
     </div>
   </main>
 
@@ -49,6 +67,13 @@
       const rangeButtons = document.querySelectorAll('.range-btn');
 
       let currentFigure = JSON.parse(document.getElementById('recap-initial-data').textContent);
+      let currentDetails = JSON.parse(document.getElementById('recap-initial-details').textContent);
+
+      // "" means the virtual top — both directions visible as roots,
+      // same convention build_recap_figure/details use for parents.
+      let currentRoot = '';
+
+      const detailsRowsEl = document.getElementById('details-rows');
 
       // A node's ring is inferable straight from its id shape — ids are
       // built as "direction", "direction/category", or
@@ -56,6 +81,17 @@
       // tells us the depth without needing a separate field for it.
       function ringDepth(id) {
         return id.split('/').length;
+      }
+
+      // ids are direction/category/expense_type paths, so a node's
+      // parent id is just itself minus its last segment — no need to
+      // walk the figure's own parents array to answer "what's above
+      // this node", which matters here since Plotly's click event only
+      // tells us what was clicked, not what the current root is.
+      function parentId(id) {
+        const parts = id.split('/');
+        parts.pop();
+        return parts.join('/');
       }
 
       function withoutSubtypes(figure) {
@@ -78,16 +114,98 @@
       }
 
       function render() {
-        const figureToShow = toggle.checked ? currentFigure : withoutSubtypes(currentFigure);
+        const showBreakdown = toggle.classList.contains('active');
+        const figureToShow = showBreakdown ? currentFigure : withoutSubtypes(currentFigure);
         Plotly.react(chartEl, figureToShow.data, figureToShow.layout, {
           responsive: true,
           displayModeBar: false,
         });
+        renderDetails();
+      }
+
+      // Recursive search through the tree for a node by id — the tree
+      // is only 3 levels deep (direction/category/expense_type), so
+      // this is cheap; no need for a flat id->node index.
+      function findNode(nodes, id) {
+        for (const node of nodes) {
+          if (node.id === id) return node;
+          const found = findNode(node.children, id);
+          if (found) return found;
+        }
+        return null;
+      }
+
+      // Flattens a node (or the top-level array, when root is "") into
+      // an ordered [{node, depth}] list for rendering — depth mirrors
+      // ringDepth's convention (1 = direction, 2 = category, 3 =
+      // expense_type) so the same maxDepth cutoff the chart uses for
+      // the breakdown toggle applies here without a second definition.
+      function flatten(nodes, depth, maxDepth, out) {
+        for (const node of nodes) {
+          if (depth > maxDepth) continue;
+          out.push({ node: node, depth: depth });
+          flatten(node.children, depth + 1, maxDepth, out);
+        }
+        return out;
+      }
+
+      function renderDetails() {
+        const showBreakdown = toggle.classList.contains('active');
+        const maxDepth = showBreakdown ? 3 : 2;
+
+        const rootNodes = currentRoot === ''
+          ? currentDetails
+          : [findNode(currentDetails, currentRoot)].filter(Boolean);
+
+        const rootDepth = currentRoot === '' ? 1 : ringDepth(currentRoot);
+        const rows = flatten(rootNodes, rootDepth, maxDepth, []);
+
+        detailsRowsEl.innerHTML = '';
+        rows.forEach(function (entry) {
+          const node = entry.node;
+          const direction = node.id.split('/')[0];
+
+          const row = document.createElement('div');
+          row.className = 'details-row direction-' + direction;
+          row.dataset.depth = entry.depth - rootDepth;
+
+          const label = document.createElement('span');
+          label.className = 'details-label';
+          label.textContent = node.label;
+
+          const pct = document.createElement('span');
+          pct.className = 'details-pct';
+          pct.textContent = node.pct_of_parent + '%';
+
+          const amount = document.createElement('span');
+          amount.className = 'details-amount';
+          amount.textContent = formatAmount(node.value);
+
+          row.append(label, pct, amount);
+          detailsRowsEl.appendChild(row);
+        });
+      }
+
+      // Mirrors filters.py's space_sep exactly: comma-grouped in the
+      // fixed en-US format (not the visitor's locale, since the server
+      // side isn't locale-aware either), then swap for a non-breaking
+      // space so a number can't wrap across two lines.
+      function formatAmount(value) {
+        return value.toLocaleString('en-US').replace(/,/g, '\u00a0') + '\u00a0Ar';
+      }
+
+      function updateTotals(totals) {
+        document.getElementById('income-total').textContent = formatAmount(totals.income);
+        document.getElementById('expense-total').textContent = formatAmount(totals.expense);
       }
 
       async function loadRange(range) {
         const res = await fetch(dataUrl + '?range=' + encodeURIComponent(range));
-        currentFigure = await res.json();
+        const payload = await res.json();
+        currentFigure = payload.figure;
+        currentDetails = payload.details;
+        currentRoot = '';
+        updateTotals(payload.totals);
         render();
       }
 
@@ -99,12 +217,29 @@
         });
       });
 
-      toggle.addEventListener('change', render);
+      toggle.addEventListener('click', function () {
+        toggle.classList.toggle('active');
+        currentRoot = '';
+        render();
+      });
 
       document
         .querySelector('.range-btn[data-range="{{ view_range }}"]')
         .classList.add('active');
       render();
+
+      // Plotly's click-to-zoom on the chart itself is native and free —
+      // this only keeps the Details list in step with it. The event
+      // tells us what was clicked, not what the new root is, so we
+      // derive that ourselves: clicking the current root zooms out (go
+      // to its parent), clicking anything else zooms in (that becomes
+      // the new root) — both are plain string ops on the id, no need
+      // to touch Plotly's internal state.
+      chartEl.on('plotly_sunburstclick', function (event) {
+        const clickedId = event.points[0].id;
+        currentRoot = clickedId === currentRoot ? parentId(clickedId) : clickedId;
+        renderDetails();
+      });
     })();
   </script>
 </body>

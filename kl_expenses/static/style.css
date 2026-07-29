@@ -13,6 +13,7 @@
   --success-bg: #eaf3ee;
   --expense: #b5651d;
   --income: #2f6f4f;
+  --toggle: #5b6b8c;
   --radius: 10px;
 }
 
@@ -51,6 +52,27 @@ body {
 
 .topbar .user {
   font-weight: 600;
+}
+
+.topbar .nav-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.nav-btn {
+  display: inline-block;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font-size: 0.82rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.nav-btn:hover {
+  border-color: var(--accent);
 }
 
 .card {
@@ -313,6 +335,113 @@ button:active {
   background: var(--bg);
 }
 
+.recap-totals {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+
+.recap-total {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.recap-total__label {
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.recap-total__value {
+  font-size: 1.15rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.recap-total--income .recap-total__value {
+  color: var(--income);
+}
+
+.recap-total--expense .recap-total__value {
+  color: var(--expense);
+}
+
+/* --- Recap details table --- */
+
+.details-table {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  margin-top: 14px;
+}
+
+.details-head {
+  display: grid;
+  grid-template-columns: 1fr 48px 96px;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--muted);
+}
+
+.details-row {
+  display: grid;
+  grid-template-columns: 1fr 48px 96px;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.85rem;
+}
+
+.details-row:last-child {
+  border-bottom: none;
+}
+
+.details-row:nth-child(even) {
+  background: var(--row-alt);
+}
+
+.details-row[data-depth="0"] .details-label {
+  font-weight: 700;
+}
+
+.details-row[data-depth="1"] .details-label {
+  padding-left: 16px;
+}
+
+.details-row[data-depth="2"] .details-label {
+  padding-left: 32px;
+  color: var(--muted);
+}
+
+.details-pct {
+  color: var(--muted);
+  text-align: right;
+  font-size: 0.78rem;
+}
+
+.details-amount {
+  text-align: right;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.details-row.direction-income .details-amount {
+  color: var(--income);
+}
+
+.details-row.direction-expense .details-amount {
+  color: var(--expense);
+}
+
 .recap-controls {
   display: flex;
   flex-wrap: wrap;
@@ -329,6 +458,7 @@ button:active {
 }
 
 .range-btn {
+  display: inline-block;
   margin: 0;
   padding: 6px 10px;
   background: transparent;
@@ -338,6 +468,7 @@ button:active {
   font-size: 0.82rem;
   font-weight: 600;
   width: auto;
+  text-decoration: none;
 }
 
 .range-btn.active {
@@ -347,11 +478,21 @@ button:active {
 }
 
 .subtype-toggle {
+  margin: 0;
+  padding: 6px 10px;
+  background: transparent;
+  border: 1px solid var(--toggle);
+  border-radius: 8px;
+  color: var(--toggle);
   font-size: 0.82rem;
-  color: var(--muted);
-  display: flex;
-  align-items: center;
-  gap: 6px;
+  font-weight: 600;
+  width: auto;
+}
+
+.subtype-toggle.active {
+  background: var(--toggle);
+  color: var(--accent-text);
+  border-color: var(--toggle);
 }
 
 #recap-chart {
