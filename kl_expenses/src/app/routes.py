@@ -15,6 +15,11 @@ from sqlalchemy import select
 from src.auth import current_user, login_required
 from src.db.session import get_session
 from src.app.models import CategoryType, DirectionType, ExpenseType, Operation, User
+from src.app.recap import (
+    RANGE_WINDOWS as RECAP_RANGE_WINDOWS,
+    build_recap_figure,
+    get_recap_data,
+)
 
 bp = Blueprint("main", __name__)
 
@@ -223,3 +228,40 @@ def toggle_operation(operation_id):
     if view_range not in ("week", "month", "all"):
         view_range = "week"
     return redirect(url_for("main.history_page", range=view_range))
+
+
+def _recap_view_range() -> str:
+    view_range = request.args.get("range", "week")
+    if view_range not in RECAP_RANGE_WINDOWS and view_range != "all":
+        view_range = "week"
+    return view_range
+
+
+@bp.route("/recap", methods=["GET"])
+@login_required
+def recap_page():
+    user = current_user()
+    db_session = get_session()
+
+    view_range = _recap_view_range()
+    data = get_recap_data(db_session, view_range)
+    fig = build_recap_figure(data)
+
+    return render_template(
+        "recap.html",
+        user_name=user.name or user.uuid[:8],
+        view_range=view_range,
+        figure_json=fig.to_json(),
+    )
+
+
+@bp.route("/recap/data", methods=["GET"])
+@login_required
+def recap_data():
+    db_session = get_session()
+
+    view_range = _recap_view_range()
+    data = get_recap_data(db_session, view_range)
+    fig = build_recap_figure(data)
+
+    return fig.to_json(), 200, {"Content-Type": "application/json"}

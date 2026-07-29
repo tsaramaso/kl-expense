@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Operations — Recap</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js" charset="utf-8"></script>
+</head>
+<body>
+  <main class="page">
+    <header class="topbar">
+      <span class="user">{{ user_name }}</span>
+      <span>
+        <a class="nav-link" href="{{ url_for('main.history_page') }}">History</a>
+        <a class="nav-link" href="{{ url_for('main.insert_page') }}">Add entry</a>
+        <form method="post" action="{{ url_for('main.logout') }}" style="display:inline">
+          <button type="submit" class="link-button">Log out</button>
+        </form>
+      </span>
+    </header>
+
+    <div class="card">
+      <h1>Recap</h1>
+
+      <div class="recap-controls">
+        <div class="range-buttons">
+          <button type="button" class="range-btn" data-range="week">This week</button>
+          <button type="button" class="range-btn" data-range="month">30 days</button>
+          <button type="button" class="range-btn" data-range="year">365 days</button>
+          <button type="button" class="range-btn" data-range="all">Everything</button>
+        </div>
+        <label class="subtype-toggle">
+          <input type="checkbox" id="subtype-toggle">
+          Show expense breakdown
+        </label>
+      </div>
+
+      <div id="recap-chart"></div>
+      <script type="application/json" id="recap-initial-data">{{ figure_json | safe }}</script>
+    </div>
+  </main>
+
+  <script>
+    (function () {
+      const dataUrl = "{{ url_for('main.recap_data') }}";
+      const chartEl = document.getElementById('recap-chart');
+      const toggle = document.getElementById('subtype-toggle');
+      const rangeButtons = document.querySelectorAll('.range-btn');
+
+      let currentFigure = JSON.parse(document.getElementById('recap-initial-data').textContent);
+
+      // A node's ring is inferable straight from its id shape — ids are
+      // built as "direction", "direction/category", or
+      // "direction/category/expense_type" in recap.py, so counting "/"
+      // tells us the depth without needing a separate field for it.
+      function ringDepth(id) {
+        return id.split('/').length;
+      }
+
+      function withoutSubtypes(figure) {
+        const trace = figure.data[0];
+        const keep = trace.ids
+          .map(function (id, i) { return ringDepth(id) <= 2 ? i : -1; })
+          .filter(function (i) { return i >= 0; });
+
+        return {
+          data: [{
+            ...trace,
+            ids: keep.map(function (i) { return trace.ids[i]; }),
+            labels: keep.map(function (i) { return trace.labels[i]; }),
+            parents: keep.map(function (i) { return trace.parents[i]; }),
+            values: keep.map(function (i) { return trace.values[i]; }),
+            marker: { colors: keep.map(function (i) { return trace.marker.colors[i]; }) },
+          }],
+          layout: figure.layout,
+        };
+      }
+
+      function render() {
+        const figureToShow = toggle.checked ? currentFigure : withoutSubtypes(currentFigure);
+        Plotly.react(chartEl, figureToShow.data, figureToShow.layout, {
+          responsive: true,
+          displayModeBar: false,
+        });
+      }
+
+      async function loadRange(range) {
+        const res = await fetch(dataUrl + '?range=' + encodeURIComponent(range));
+        currentFigure = await res.json();
+        render();
+      }
+
+      rangeButtons.forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          rangeButtons.forEach(function (b) { b.classList.remove('active'); });
+          btn.classList.add('active');
+          loadRange(btn.dataset.range);
+        });
+      });
+
+      toggle.addEventListener('change', render);
+
+      document
+        .querySelector('.range-btn[data-range="{{ view_range }}"]')
+        .classList.add('active');
+      render();
+    })();
+  </script>
+</body>
+</html>
