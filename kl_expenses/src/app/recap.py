@@ -1,6 +1,7 @@
 # app/recap.py
 
 from colorsys import hls_to_rgb, rgb_to_hls
+from typing import Any
 import plotly.graph_objects as go
 from datetime import datetime, timedelta, timezone
 from sqlalchemy import func, select
@@ -59,6 +60,20 @@ def get_recap_data(db_session: Session, range_key: str) -> list[dict]:
     ]
 
 
+def direction_totals(data: list[dict]) -> dict[str, int]:
+    """
+    Sum amounts per direction straight from get_recap_data's flat rows —
+    no need to touch the DB again or reach into build_recap_figure's
+    tree-building internals. Missing directions (e.g. an all-income
+    range with zero expenses) simply won't have a key; callers should
+    default with .get(direction, 0).
+    """
+    totals: dict[str, int] = {}
+    for row in data:
+        totals[row["direction"]] = totals.get(row["direction"], 0) + row["amount"]
+    return totals
+
+
 DIRECTION_COLORS = {
     "expense": "#b5651d",  # matches History's expense color
     "income": "#2f6f4f",  # matches History's income color / existing accent
@@ -100,15 +115,13 @@ def _expense_type_color(direction: str, category: str, index: int) -> str:
     return _hls_to_hex(hue, lightness + 0.06 + index * 0.05, saturation * 0.9)
 
 
-def build_recap_figure(data: list[dict]) -> go.Figure:
+def _build_amount_tree(data: list[dict]) -> dict[str, dict[str, dict[str | None, int]]]:
     """
-    Shape aggregated (direction, category, expense_type, amount) rows
-    into a 3-ring sunburst: Direction -> Category -> ExpenseType.
-
-    Assumes the app-level invariant that expense_type is always set for
-    direction=expense and always None for direction=income (enforced in
-    routes.py's insert validation) — a single category's rows never mix
-    both, so there's no "orphaned amount" case to reconcile here.
+    Shared by build_recap_figure and build_recap_details — both need the
+    same (direction, category, expense_type) -> amount grouping, just
+    shaped differently afterward. Keeping this in one place means a
+    future change to how rows get grouped can't accidentally apply to
+    only one of the two consumers.
     """
     tree: dict[str, dict[str, dict[str | None, int]]] = {}
     for row in data:
@@ -120,6 +133,20 @@ def build_recap_figure(data: list[dict]) -> go.Figure:
         )
         tree.setdefault(d, {}).setdefault(c, {})
         tree[d][c][et] = tree[d][c].get(et, 0) + amount
+    return tree
+
+
+def build_recap_figure(data: list[dict]) -> go.Figure:
+    """
+    Shape aggregated (direction, category, expense_type, amount) rows
+    into a 3-ring sunburst: Direction -> Category -> ExpenseType.
+
+    Assumes the app-level invariant that expense_type is always set for
+    direction=expense and always None for direction=income (enforced in
+    routes.py's insert validation) — a single category's rows never mix
+    both, so there's no "orphaned amount" case to reconcile here.
+    """
+    tree = _build_amount_tree(data)
 
     ids: list[str] = []
     labels: list[str] = []
@@ -178,8 +205,90 @@ def build_recap_figure(data: list[dict]) -> go.Figure:
     return fig
 
 
-def direction_totals(data: list[dict]) -> dict[str, int]:
-    totals: dict[str, int] = {}
-    for row in data:
-        totals[row["direction"]] = totals.get(row["direction"], 0) + row["amount"]
-    return totals
+def _pct(value: int, parent_total: int) -> float:
+    # Guard against a zero parent total (an empty range) rather than
+    # relying on callers to check first every time.
+    return round(value / parent_total * 100, 1) if parent_total else 0.0
+
+
+# Heterogeneous by nature (id: str, value: int, pct_of_parent: float,
+# children: list) — without this, mypy infers the value type of each
+# literal dict as the join of all four, which collapses to `object`
+# the moment it's put in a list, breaking any arithmetic on node["value"]
+# later (e.g. the unary "-" in the sort-by-value calls below).
+DetailNode = dict[str, Any]
+
+
+def build_recap_details(data: list[dict]) -> list[DetailNode]:
+    """
+    Build the grouped tree for the Details list under the chart:
+    Direction -> Category -> ExpenseType, each node carrying its own
+    fixed percentage of its immediate parent (never recalculated on
+    zoom — the client only filters *which* nodes are visible, it
+    doesn't touch these numbers) and children sorted biggest-first.
+
+    ids match the sunburst's own ids exactly ("income", "income/kl",
+    "income/kl/food", ...) so the client can reuse one id scheme for
+    both zoom-tracking and list-filtering instead of a second mapping.
+    """
+    tree = _build_amount_tree(data)
+    grand_total = sum(
+        amount
+        for categories in tree.values()
+        for expense_types in categories.values()
+        for amount in expense_types.values()
+    )
+
+    direction_nodes: list[DetailNode] = []
+
+    for direction, categories in tree.items():
+        direction_total = sum(
+            sum(expense_types.values()) for expense_types in categories.values()
+        )
+
+        category_nodes: list[DetailNode] = []
+        for category, expense_types in categories.items():
+            category_id = f"{direction}/{category}"
+            category_total = sum(expense_types.values())
+
+            # Same explicit None-filter as build_recap_figure, for the
+            # same reason: don't rely on the invariant implicitly.
+            real_expense_types = [
+                (et, amount) for et, amount in expense_types.items() if et is not None
+            ]
+
+            type_nodes: list[DetailNode] = [
+                {
+                    "id": f"{category_id}/{et}",
+                    "label": et.replace("_", " ").title(),
+                    "value": amount,
+                    "pct_of_parent": _pct(amount, category_total),
+                    "children": [],
+                }
+                for et, amount in real_expense_types
+            ]
+            type_nodes.sort(key=lambda node: -node["value"])
+
+            category_nodes.append(
+                {
+                    "id": category_id,
+                    "label": category.replace("_", " ").title(),
+                    "value": category_total,
+                    "pct_of_parent": _pct(category_total, direction_total),
+                    "children": type_nodes,
+                }
+            )
+        category_nodes.sort(key=lambda node: -node["value"])
+
+        direction_nodes.append(
+            {
+                "id": direction,
+                "label": direction.title(),
+                "value": direction_total,
+                "pct_of_parent": _pct(direction_total, grand_total),
+                "children": category_nodes,
+            }
+        )
+
+    direction_nodes.sort(key=lambda node: -node["value"])
+    return direction_nodes

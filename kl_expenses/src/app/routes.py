@@ -18,6 +18,7 @@ from src.db.session import get_session
 from src.app.models import CategoryType, DirectionType, ExpenseType, Operation, User
 from src.app.recap import (
     RANGE_WINDOWS as RECAP_RANGE_WINDOWS,
+    build_recap_details,
     build_recap_figure,
     direction_totals,
     get_recap_data,
@@ -249,6 +250,7 @@ def recap_page():
     data = get_recap_data(db_session, view_range)
     fig = build_recap_figure(data)
     totals = direction_totals(data)
+    details = build_recap_details(data)
 
     return render_template(
         "recap.html",
@@ -257,6 +259,7 @@ def recap_page():
         figure_json=fig.to_json(),
         income_total=totals.get("income", 0),
         expense_total=totals.get("expense", 0),
+        details_json=json.dumps(details),
     )
 
 
@@ -269,6 +272,7 @@ def recap_data():
     data = get_recap_data(db_session, view_range)
     fig = build_recap_figure(data)
     totals = direction_totals(data)
+    details = build_recap_details(data)
 
     payload = {
         "figure": json.loads(fig.to_json()),
@@ -276,5 +280,6 @@ def recap_data():
             "income": totals.get("income", 0),
             "expense": totals.get("expense", 0),
         },
+        "details": details,
     }
     return json.dumps(payload), 200, {"Content-Type": "application/json"}

@@ -11,24 +11,30 @@
     <header class="topbar">
       <span class="user">{{ user_name }}</span>
       <span class="nav-actions">
-      <a class="nav-btn" href="{{ url_for('main.insert_page') }}">Add entry</a>
-      <a class="nav-btn" href="{{ url_for('main.history_page') }}">History</a>
-      <form method="post" action="{{ url_for('main.logout') }}" style="display:inline">
+        <a class="nav-btn" href="{{ url_for('main.insert_page') }}">Add entry</a>
+        <a class="nav-btn" href="{{ url_for('main.recap_page') }}">Recap</a>
+        <form method="post" action="{{ url_for('main.logout') }}" style="display:inline">
           <button type="submit" class="link-button">Log out</button>
-      </form>
+        </form>
       </span>
     </header>
 
     <div class="card">
       <h1>History</h1>
 
-      <div class="range-tabs">
-        <a href="{{ url_for('main.history_page', range='week') }}"
-           class="{% if view_range == 'week' %}active{% endif %}">This week</a>
-        <a href="{{ url_for('main.history_page', range='month') }}"
-           class="{% if view_range == 'month' %}active{% endif %}">See more (30d)</a>
-        <a href="{{ url_for('main.history_page', range='all') }}"
-           class="{% if view_range == 'all' %}active{% endif %}">Everything</a>
+      <div class="range-buttons">
+        <form method="get" action="{{ url_for('main.history_page') }}">
+          <button type="submit" name="range" value="week"
+                  class="range-btn {% if view_range == 'week' %}active{% endif %}">This week</button>
+        </form>
+        <form method="get" action="{{ url_for('main.history_page') }}">
+          <button type="submit" name="range" value="month"
+                  class="range-btn {% if view_range == 'month' %}active{% endif %}">See more (30d)</button>
+        </form>
+        <form method="get" action="{{ url_for('main.history_page') }}">
+          <button type="submit" name="range" value="all"
+                  class="range-btn {% if view_range == 'all' %}active{% endif %}">Everything</button>
+        </form>
       </div>
 
       {% if operations %}
