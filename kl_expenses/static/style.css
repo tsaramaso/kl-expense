@@ -391,3 +391,34 @@ button:active {
 .nav-btn:hover {
   border-color: var(--accent);
 }
+
+.recap-totals {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+
+.recap-total {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.recap-total__label {
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.recap-total__value {
+  font-size: 1.15rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.recap-total--income .recap-total__value {
+  color: var(--income);
+}
+
+.recap-total--expense .recap-total__value {
+  color: var(--expense);
+}

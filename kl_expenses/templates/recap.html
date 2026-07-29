@@ -12,13 +12,13 @@
     <header class="topbar">
       <span class="user">{{ user_name }}</span>
       <span class="nav-actions">
-      <a class="nav-btn" href="{{ url_for('main.insert_page') }}">Add entry</a>
-      <a class="nav-btn" href="{{ url_for('main.history_page') }}">History</a>
-      <form method="post" action="{{ url_for('main.logout') }}" style="display:inline">
+        <a class="nav-btn" href="{{ url_for('main.history_page') }}">History</a>
+        <a class="nav-btn" href="{{ url_for('main.insert_page') }}">Add entry</a>
+        <form method="post" action="{{ url_for('main.logout') }}" style="display:inline">
           <button type="submit" class="link-button">Log out</button>
-      </form>
+        </form>
       </span>
-      </header>
+    </header>
 
     <div class="card">
       <h1>Recap</h1>
@@ -30,7 +30,18 @@
           <button type="button" class="range-btn" data-range="year">365 days</button>
           <button type="button" class="range-btn" data-range="all">Everything</button>
         </div>
-          <button type="button" class="subtype-toggle" id="subtype-toggle">Breakdown</button>
+        <button type="button" class="subtype-toggle" id="subtype-toggle">Breakdown</button>
+      </div>
+
+      <div class="recap-totals">
+        <div class="recap-total recap-total--income">
+          <span class="recap-total__label">Income</span>
+          <span class="recap-total__value" id="income-total">{{ income_total|space_sep }}&nbsp;Ar</span>
+        </div>
+        <div class="recap-total recap-total--expense">
+          <span class="recap-total__label">Expense</span>
+          <span class="recap-total__value" id="expense-total">{{ expense_total|space_sep }}&nbsp;Ar</span>
+        </div>
       </div>
 
       <div id="recap-chart"></div>
@@ -74,18 +85,33 @@
         };
       }
 
-        function render() {
+      function render() {
         const showBreakdown = toggle.classList.contains('active');
         const figureToShow = showBreakdown ? currentFigure : withoutSubtypes(currentFigure);
         Plotly.react(chartEl, figureToShow.data, figureToShow.layout, {
-            responsive: true,
-            displayModeBar: false,
+          responsive: true,
+          displayModeBar: false,
         });
-        }
+      }
+
+      // Mirrors filters.py's space_sep exactly: comma-grouped in the
+      // fixed en-US format (not the visitor's locale, since the server
+      // side isn't locale-aware either), then swap for a non-breaking
+      // space so a number can't wrap across two lines.
+      function formatAmount(value) {
+        return value.toLocaleString('en-US').replace(/,/g, '\u00a0') + '\u00a0Ar';
+      }
+
+      function updateTotals(totals) {
+        document.getElementById('income-total').textContent = formatAmount(totals.income);
+        document.getElementById('expense-total').textContent = formatAmount(totals.expense);
+      }
 
       async function loadRange(range) {
         const res = await fetch(dataUrl + '?range=' + encodeURIComponent(range));
-        currentFigure = await res.json();
+        const payload = await res.json();
+        currentFigure = payload.figure;
+        updateTotals(payload.totals);
         render();
       }
 
@@ -97,12 +123,10 @@
         });
       });
 
-      toggle.addEventListener('change', render);
-
       toggle.addEventListener('click', function () {
         toggle.classList.toggle('active');
         render();
-        });
+      });
 
       document
         .querySelector('.range-btn[data-range="{{ view_range }}"]')

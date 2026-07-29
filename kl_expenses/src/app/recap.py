@@ -176,3 +176,10 @@ def build_recap_figure(data: list[dict]) -> go.Figure:
     )
     fig.update_layout(margin=dict(t=10, l=10, r=10, b=10))
     return fig
+
+
+def direction_totals(data: list[dict]) -> dict[str, int]:
+    totals: dict[str, int] = {}
+    for row in data:
+        totals[row["direction"]] = totals.get(row["direction"], 0) + row["amount"]
+    return totals
