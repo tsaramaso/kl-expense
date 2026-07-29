@@ -14,6 +14,8 @@
   --expense: #b5651d;
   --income: #2f6f4f;
   --radius: 10px;
+  --toggle: #5b6b8c;
+  --radius: 10px;
 }
 
 * {
@@ -347,11 +349,21 @@ button:active {
 }
 
 .subtype-toggle {
+  margin: 0;
+  padding: 6px 10px;
+  background: transparent;
+  border: 1px solid var(--toggle);
+  border-radius: 8px;
+  color: var(--toggle);
   font-size: 0.82rem;
-  color: var(--muted);
-  display: flex;
-  align-items: center;
-  gap: 6px;
+  font-weight: 600;
+  width: auto;
+}
+
+.subtype-toggle.active {
+  background: var(--toggle);
+  color: var(--accent-text);
+  border-color: var(--toggle);
 }
 
 #recap-chart {

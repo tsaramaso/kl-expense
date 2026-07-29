@@ -30,10 +30,7 @@
           <button type="button" class="range-btn" data-range="year">365 days</button>
           <button type="button" class="range-btn" data-range="all">Everything</button>
         </div>
-        <label class="subtype-toggle">
-          <input type="checkbox" id="subtype-toggle">
-          Show expense breakdown
-        </label>
+          <button type="button" class="subtype-toggle" id="subtype-toggle">Breakdown</button>
       </div>
 
       <div id="recap-chart"></div>
@@ -77,13 +74,14 @@
         };
       }
 
-      function render() {
-        const figureToShow = toggle.checked ? currentFigure : withoutSubtypes(currentFigure);
+        function render() {
+        const showBreakdown = toggle.classList.contains('active');
+        const figureToShow = showBreakdown ? currentFigure : withoutSubtypes(currentFigure);
         Plotly.react(chartEl, figureToShow.data, figureToShow.layout, {
-          responsive: true,
-          displayModeBar: false,
+            responsive: true,
+            displayModeBar: false,
         });
-      }
+        }
 
       async function loadRange(range) {
         const res = await fetch(dataUrl + '?range=' + encodeURIComponent(range));
@@ -100,6 +98,11 @@
       });
 
       toggle.addEventListener('change', render);
+
+      toggle.addEventListener('click', function () {
+        toggle.classList.toggle('active');
+        render();
+        });
 
       document
         .querySelector('.range-btn[data-range="{{ view_range }}"]')
